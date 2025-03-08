@@ -181,6 +181,32 @@ The listener must have the same format for its "raw" input!
 Another `--buffer` parameter for the sender should help reduce latency. There
 seemed to be a noticable amount.
 
+# Testing across an actual network connection
 
+I logged into my Intel Mac Mini, which is also connected via gigabit ethernet to
+the same switch as the M2 MacBook Air I had been using for the above work. I
+used Homebrew to install `sox` and `netcat` with `brew install sox netcat`.
 
+Since it has built-in speakers, I wanted to play the audio from the Mac MacMini.
+
+This worked:
+Listener, on the Mac Mini
+`nc --verbose -l -p 5555 | play --buffer 32 -t raw -b 16 -r8k -esigned-integer -c 1 -`
+
+Sender, on the MacBook Air
+`sox -V6 --buffer 32  -t coreaudio "BlackHole 2ch" -t raw -b 16 -r8k -esigned-integer -c 1 - | nc --verbose 192.168.0.61  5555`
+
+Note that it isn't using UDP. Adding the `-u` flag to both did work as well.
+The sender reports a many buffer overruns with discarded data. And you can tell
+in the audio there are glitches. The latency is noticable.
+
+Counter intuitively, raising the sample rate to 48k seemed to greatly improve
+the latency. It sounded nearly simultaneous. There were still many buffer errors
+reported on the sender console.
+
+Sender:
+`sox -V6 --buffer 32  -t coreaudio "BlackHole 2ch" -t raw -b 16 -r48k -esigned-integer -c 1 - | nc --verbose -u 192.168.0.61  5555`
+
+Reciever:
+`nc --verbose -u -l -p 5555 | play --buffer 32 -t raw -b 16 -r48k -esigned-integer -c 1 -`
 
