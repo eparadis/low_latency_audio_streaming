@@ -58,7 +58,7 @@ Explanation
  audiocapture.mp3   the file to save to
 ```
 
-## Trying it out
+### Trying it out
 
 1. I opened VCV Rack 2 Free and created a patch that generated sound
    continuously.
@@ -87,6 +87,8 @@ simply does not work as it should. Instead, you should use `sox`.
 
 I installed `sox` with `brew install sox`. It installed version 14.4.2.
 
+### Trying it out
+
 1. I recorded `sox -t coreaudio "BlackHole 2ch" test.wav`.
 2. I had to stop the recording manually with CTRL-C.
 3. Audio quality was excellent.
@@ -98,5 +100,62 @@ The MP3 was 10 seconds long and 166KB. The WAV was 7s and 2.6MB.
 
 Additionally, `sox` gave a live preview of the recording levels in the terminal
 as it recorded.
+
+`sox test.wav -d` played the earlier recorded earlier.
+
+## netcat (`nc`)
+
+`netcat` was already installed with MacOS, but I have it better in general to
+install versions from Homebrew because it is easier to know what version you are
+getting. Also they tend to be much newer and contain useful patches.
+
+I installed `netcat` with `brew install netcat`. It installed version 0.7.1.
+
+### Trying it out
+
+The goal is to do something like this:
+`sox test.wav - | nc 127.0.0.1 12345` in one window and 
+`nc -l 12345 | sox - -d` in another
+to send the previously recorded audio over `netcat` and play it out the default
+audio device. And `nc` is fine with this, but `sox` wants more information about
+the audio format being used.
+
+The `sox` manual states there are four pieces of info involved:
+- sample rate   (-r rate)
+- sample size   (-b bits)
+- data encoding (-e enc)
+- channels      (-c channels)
+
+`nc -u 127.0.0.1 12345 | play --buffer 32 -tcvsd -r8k -` and
+`rec --buffer 32 -tcvsd -r8k - | nc -u -l 12345` 
+almost seemed to work.
+
+It felt like `nc` wasn't working right, so I went back to a simpler step and
+tested just the UDP part.
+`nc -u -l -p 5555`    You must run this first (the listener)
+`nc -u localhost 5555`
+
+If either of the two closes (ie: via CTRL-C), the other doesn't know about it
+until it tries to do something.
+
+Also note that if the listener is listening, and the sender connects, then
+disconnects, the sender cannot re-connect. The listener looks to be working but
+the second instance of the sender will fail.
+
+The following actually worked:
+1. start the listener with `nc -u -l -p 5555 | play --buffer 32 -tcvsd -r8k -`
+2. start the sender with `rec --buffer 32 -tcvsd -r8k - | nc -u localhost 5555`
+Since I was playing and recording on the same machine, there was an echo effect
+as it recorded it's own playback. The period of this sounded like about 100 to
+200mS. That isn't a good sign for latency.
+
+### Connecting to an audio source
+
+I want to record from the virtual audio cable to avoid having to deal with
+switching input and whatnot with the script.
+
+
+
+
 
 
