@@ -154,7 +154,32 @@ as it recorded it's own playback. The period of this sounded like about 100 to
 I want to record from the virtual audio cable to avoid having to deal with
 switching input and whatnot with the script.
 
+I found this example of doing a FX patch between CoreAudio devices:
+`sox -V6 -r 44100 -t coreaudio "BlackHole 2ch" -t coreaudio "MacBook Air Speakers" reverb 100 50 100 100 100 3`
 
+Since I was already playing "into" the Blackhole pipe at 48k, it would not open
+at 44.1k and instead switched to 48k. I think this is a property of Blackhole,
+not of `sox`. Further, with the `-V6` verbosity, I could see that when I played
+into the BlackHole input at only 8k, it would complain about not being able to
+set the MacBook's speakers to 8k and would switch back to 48k. The high level of
+verbosity provided helpful info about the audio input and output formats too.
+
+Also messing with the reverb was fun.
+
+I was able to send audio through `nc` like this:
+`nc -u -l -p 5555 | play --buffer 32 -t raw -b 16 -r8k -esigned-integer -c 1  -`
+`sox -V6 -t coreaudio "BlackHole 2ch" -t raw -b 16 -r8k -esigned-integer -c 1 - | nc -u localhost 5555`
+
+The first command is the listener. `nc` is listening on port 5555 for UDP data.
+
+The second command is the sender. `sox` is opening the coreaudio device and then
+playing it to stdout with a "raw" format of 16bit 8kHz signed-integer single-
+channel audio.
+
+The listener must have the same format for its "raw" input!
+
+Another `--buffer` parameter for the sender should help reduce latency. There
+seemed to be a noticable amount.
 
 
 
