@@ -210,3 +210,58 @@ Sender:
 Reciever:
 `nc --verbose -u -l -p 5555 | play --buffer 32 -t raw -b 16 -r48k -esigned-integer -c 1 -`
 
+# Debugging
+
+`play -t coreaudio "asdf" -n -stat` show stats while recording from a device
+
+To use UDP, I had to specify the source address:
+`nc --verbose -s 192.168.0.140  -u -l -p 31215 | sox -V6 -t raw -b 32 -r48k -e signed-integer -c 1 - -r48k  -d remix 1 1`
+
+I also had to add a rule for port forwarding in my router, which isn't surprising.
+
+# results
+
+With UDP over the internet from Vermont to Washinton, we were able to run for 6m 13s (17.9MB) before the
+connection dropped.
+
+When both sides were on ethernet, audio quality for `-b32 r48k -c1` with UDP was very good. That is a high rate
+audio setting in any case, but importantly there wasn't any stutter or drop outs.
+
+Listening command:
+`nc --verbose -s 192.168.0.140 -u -l -p 31215 | sox -V6 -t raw -b 32 -r48k -e signed-integer -c 1 - -r48k  -d remix 1 1`
+
+Sending command:
+`sox -V4 --type coreaudio "Clarett+ 8Pre" --type raw - remix -m 1-18 | nc --verbose -s 192.168.40.181 -u ${EXT_IP_A} ${EXT_PORT_A}`
+
+
+We were almost exactly one beat round trip at 130.02bpm
+130.02 beats  1 minute   1 sec    -> 0.002167 beats    ->    461.5 mS   
+1 minute      60 sec    1000 mS        milliseconds          1 beat
+
+
+https://www.aeronetworks.ca/2015/09/audio-networking-with-sox-and-netcat.html
+
+# using socat
+
+sender command:
+`sox -V6 --type coreaudio "Clarett+ 8Pre" --type raw - remix -m 1-18 | socat -d -d -u STDIN UDP:192.168.40.69:5555,sourceport=5555`
+
+
+receiver command:
+`socat -d -d -u UDP-LISTEN:5555,bind=192.168.40.69,reuseaddr,sourceport=5555 STDOUT \
+    | sox -V6 -t raw -b 32 -r48k -e signed-integer -c 1 - -r48k -d remix 1 1`
+
+
+
+
+# localhost with ncat
+`sox --buffer 32 -V6  --type coreaudio "BlackHole 2ch"  -traw -b16 -r16k -esigned-integer -c1 - | ncat localhost`
+`ncat -l -i1 -k | sox -V6 -traw -b16 -r16k -esigned-integer -c1 - -d remix 1 1`
+
+
+strangely, we seemed to see better latency performance with 48k over lower bit-rates. 96k was good too.
+
+`sox --multi-threaded  --buffer 1024  -V6 --type coreaudio "BlackHole 2ch" -traw -b8 -r96k -esigned-integer -c1 - remix 1-2 | socat -d -d -u STDIN UDP:${EXT_IP_B}:${EXT_IP_B},sourceport=5555`
+
+
+ 
