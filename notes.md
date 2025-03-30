@@ -275,5 +275,17 @@ on the remote machine (acting as netcat listener):
 on the local machine (acting as netcat sender):
 `cat /dev/zero |  nc --verbose 192.168.0.61  5555`
 
-This doesn't do 
- 
+I added the ability to ignore lines at startup and it just generally tries to do
+the most useful thing if it might not be exactly perfectly accurate.
+
+You can use `-c` with the `homebrew` version of `GNU netcat` to close the socket
+on the sender when EOF is reached (even though this isn't mentioned in the man
+page at all...)
+
+on the sender
+`yes 'some example text that you could make longer if you want' | head -n 1000 |nc -c --verbose 192.168.0.129 5555`
+
+on the receiver
+`nc --verbose -l -p 5555 | ./console_loopback_timer -q`
+
+
