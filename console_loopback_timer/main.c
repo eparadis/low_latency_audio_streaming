@@ -35,6 +35,25 @@ double max_time = 0.0;
 double avg_time = 0.0;
 int no_summary = 0;
 
+ssize_t read_a_line(char *buffer, size_t size)
+{
+  // Read a line from stdin
+  char *result = fgets(buffer, size, stdin);
+  if (result) {
+    ssize_t bytes_read = strlen(buffer);
+    char *newline = strchr(buffer, '\n');
+    if (newline) {
+      *(newline + 1) = '\0'; // Truncate at newline
+    }
+    return bytes_read;
+  } else if (ferror(stdin)) {
+    perror("Error reading from stdin");
+    return -1;
+  } else {
+    return 0; // EOF
+  }
+}
+
 void print_stat_summary()
 {
   fprintf(stderr, "\nSummary:\n");
@@ -64,12 +83,13 @@ void sig_handler(int _signum)
 void print_usage()
 {
   // Print usage information
-  fprintf(stderr, "Usage: console_loopback_timer [-c N] [-q] [-v] [-g] [-n]\n");
+  fprintf(stderr, "Usage: console_loopback_timer [-c N] [-q] [-v] [-g] [-n] [-i N]\n");
   fprintf(stderr, "  -c N     After N lines are received, exit the program\n");
   fprintf(stderr, "  -q       Quiet mode. Do not print the timing of each line as it is received.\n");
   fprintf(stderr, "  -v       Verbose mode. Print the running statistics of the timing for each line.\n");
   fprintf(stderr, "  -g       Graph mode. Instead of timing information, print an ASCII bar graph.\n");
   fprintf(stderr, "  -n       No statistical summary. Suppress printing the statistical summary when exiting.\n");
+  fprintf(stderr, "  -i N     Ignore the first N lines. This is useful to avoid measuring setting up the connection.\n");
 }
 
 int main(int argc, char *argv[])
@@ -79,10 +99,11 @@ int main(int argc, char *argv[])
   int verbose = 0;
   int graph = 0;
   int count = -1; // -1 means no limit
+  int lines_to_ignore = 0;
   struct timeval start_time, end_time, elapsed_time;
 
   // Parse command line arguments
-  while ((c = getopt(argc, argv, "c:qvgn")) != -1)
+  while ((c = getopt(argc, argv, "c:qvgni:")) != -1)
   {
     switch (c)
     {
@@ -101,6 +122,9 @@ int main(int argc, char *argv[])
     case 'n':
       no_summary = 1;
       break;
+    case 'i':
+      lines_to_ignore = atoi(optarg);
+      break;
     default:
       print_usage();
       exit(EXIT_FAILURE);
@@ -116,12 +140,31 @@ int main(int argc, char *argv[])
 
   // Initialize start time
   gettimeofday(&start_time, NULL);
+  
+  if(lines_to_ignore > 0) {
+    char buffer[1024];
+    // Read and ignore the first set of lines
+    for( int i = 0; i < lines_to_ignore; i++ )
+    {
+      ssize_t bytes_read = read_a_line(buffer, sizeof(buffer));
+      if (bytes_read < 0)
+      {
+        perror("read");
+        exit(EXIT_FAILURE);
+      }
+      if (bytes_read == 0)
+      {
+        fprintf(stderr, "EOF while ignoring input lines\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
 
   // Main loop
+  char buffer[1024];
   while (1)
   {
-    char buffer[1024];
-    ssize_t bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
+    ssize_t bytes_read = read_a_line(buffer, sizeof(buffer));
     if (bytes_read < 0)
     {
       perror("read");
@@ -143,12 +186,17 @@ int main(int argc, char *argv[])
     double elapsed_ms = (elapsed_time.tv_sec * 1e3) + (elapsed_time.tv_usec / 1e3);
 
     // Update total time and statistics
-    total_time += elapsed_ms;
-    if (lines_received == 1 || elapsed_ms < min_time)
+    
+    // ignore the first measurement b/c it will include start up time
+    if( lines_received != 1) {
+      total_time += elapsed_ms;
+    }
+      
+    if (lines_received == 2 || elapsed_ms < min_time)
     {
       min_time = elapsed_ms;
     }
-    if (lines_received == 1 || elapsed_ms > max_time)
+    if (lines_received == 2 || elapsed_ms > max_time)
     {
       max_time = elapsed_ms;
     }
