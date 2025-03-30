@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
     // Calculate elapsed time
     timersub(&end_time, &start_time, &elapsed_time);
-    double elapsed_ms = (elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0) / 1e3;
+    double elapsed_ms = (elapsed_time.tv_sec + elapsed_time.tv_usec / 1e6) / 1e3;
 
     // Update total time and statistics
     total_time += elapsed_ms;
