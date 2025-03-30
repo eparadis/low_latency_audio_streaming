@@ -288,4 +288,43 @@ on the sender
 on the receiver
 `nc --verbose -l -p 5555 | ./console_loopback_timer -q`
 
+# Using the rate limited data generator program
+
+`./rate_limited_data_generator -r 10 -b '65 90'` will generate the numbers 65 to
+90 and back again forever.
+
+## loop back test at 100 Hz
+
+First, set up the receiver
+`nc --verbose -l -u -p 5555 | ./console_loopback_timer/console_loopback_timer -c 100 -q`
+
+Then start the sender in another terminal:
+`./rate_limited_data_generator/rate_limited_data_generator -r 100 -b '0 100' | nc --verbose -u localhost 5555`
+
+What's happenign is that the receiver is listening on port 5555 UDP. It's
+listening for 100 lines. The sender is generating data at 100 Hz. The data is
+just ASCII strings of numbers from 0 to 100. That is being sent to localhost
+port 5555 over UDP.
+
+After the receiver gets 100 lines, it closes the connection, which shuts down
+the sender as well.
+
+As an example, this is the result I got once:
+```
+Summary:
+  Total lines received: 100
+  Total time: 1198.166 ms
+  Min/Avg/Max time: 1.066/11.982/12.638 ms
+```
+
+That's saying that on average, it took 11.982 ms between lines. We'd expect 100
+Hertz to have 10 ms between lines. So that's just about 2 ms of 'latency' due
+to who knows what.
+
+It's also worth pointing out that at least one packet arrived early or something
+because there's a minium value of only 1.066 ms. Nothing arrived too late,
+however. The longest delay was 2.638 ms.
+
+
+
 
