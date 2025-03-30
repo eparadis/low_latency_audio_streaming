@@ -263,5 +263,17 @@ strangely, we seemed to see better latency performance with 48k over lower bit-r
 
 `sox --multi-threaded  --buffer 1024  -V6 --type coreaudio "BlackHole 2ch" -traw -b8 -r96k -esigned-integer -c1 - remix 1-2 | socat -d -d -u STDIN UDP:${EXT_IP_B}:${EXT_IP_B},sourceport=5555`
 
+# Using the timing program
 
+I had a robot write most of a console app to measure timing. The program has
+bugs but basic usage goes something like the following. Note: this isn't
+actually measuring the full loop back yet.
+
+on the remote machine (acting as netcat listener):
+`nc --verbose -l -p 5555 | ./console_loopback_timer -c 20 -v`
+
+on the local machine (acting as netcat sender):
+`cat /dev/zero |  nc --verbose 192.168.0.61  5555`
+
+This doesn't do 
  

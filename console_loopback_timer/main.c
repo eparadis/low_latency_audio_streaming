@@ -33,15 +33,16 @@ double total_time = 0.0;
 double min_time = 0.0;
 double max_time = 0.0;
 double avg_time = 0.0;
+int no_summary = 0;
 
 void print_stat_summary()
 {
-  printf("\nSummary:\n");
-  printf("  Total lines received: %d\n", lines_received);
-  printf("  Total time: %.3f seconds\n", total_time);
-  printf("  Min time: %.3f seconds\n", min_time);
-  printf("  Max time: %.3f seconds\n", max_time);
-  printf("  Avg time: %.3f seconds\n", avg_time);
+  fprintf(stderr, "\nSummary:\n");
+  fprintf(stderr, "  Total lines received: %d\n", lines_received);
+  fprintf(stderr, "  Total time: %.3f ms\n", total_time);
+  fprintf(stderr, "  Min time: %.3f ms\n", min_time);
+  fprintf(stderr, "  Max time: %.3f ms\n", max_time);
+  fprintf(stderr, "  Avg time: %.3f ms\n", avg_time);
 }
 
 void sig_handler(int _signum)
@@ -50,8 +51,11 @@ void sig_handler(int _signum)
   if( _signum == SIGINT )
   {
     // Print a message and exit
-    printf("\nReceived CTRL+C. Exiting...\n");
-    print_stat_summary();
+    fprintf(stderr, "\nReceived CTRL+C. Exiting...\n");
+    if(!no_summary)
+    {
+      print_stat_summary();
+    }
     fflush(stdout);
     exit(0);
   }
@@ -74,7 +78,6 @@ int main(int argc, char *argv[])
   int quiet = 0;
   int verbose = 0;
   int graph = 0;
-  int no_summary = 0;
   int count = -1; // -1 means no limit
   struct timeval start_time, end_time, elapsed_time;
 
@@ -137,17 +140,17 @@ int main(int argc, char *argv[])
 
     // Calculate elapsed time
     timersub(&end_time, &start_time, &elapsed_time);
-    double elapsed_seconds = elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0;
+    double elapsed_ms = (elapsed_time.tv_sec + elapsed_time.tv_usec / 1000000.0) / 1e3;
 
     // Update total time and statistics
-    total_time += elapsed_seconds;
-    if (lines_received == 1 || elapsed_seconds < min_time)
+    total_time += elapsed_ms;
+    if (lines_received == 1 || elapsed_ms < min_time)
     {
-      min_time = elapsed_seconds;
+      min_time = elapsed_ms;
     }
-    if (lines_received == 1 || elapsed_seconds > max_time)
+    if (lines_received == 1 || elapsed_ms > max_time)
     {
-      max_time = elapsed_seconds;
+      max_time = elapsed_ms;
     }
     avg_time = total_time / lines_received;
 
@@ -156,7 +159,7 @@ int main(int argc, char *argv[])
     {
       if (graph)
       {
-        int bar_length = (int)(elapsed_seconds * 10); // Scale for graph
+        int bar_length = (int)(elapsed_ms * 10); // Scale for graph
         printf("%s", buffer);
         for (int i = 0; i < bar_length; i++)
         {
@@ -166,11 +169,11 @@ int main(int argc, char *argv[])
       }
       else if (verbose)
       {
-        printf("%s: %.3f seconds (min: %.3f, max: %.3f, avg: %.3f)\n", buffer, elapsed_seconds, min_time, max_time, avg_time);
+        printf("%s: %.3f ms (min: %.3f, max: %.3f, avg: %.3f)\n", buffer, elapsed_ms, min_time, max_time, avg_time);
       }
       else
       {
-        printf("%s: %.3f seconds\n", buffer, elapsed_seconds);
+        printf("%s\n", buffer);
       }
     }
 
