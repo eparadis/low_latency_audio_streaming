@@ -59,9 +59,7 @@ void print_stat_summary()
   fprintf(stderr, "\nSummary:\n");
   fprintf(stderr, "  Total lines received: %d\n", lines_received);
   fprintf(stderr, "  Total time: %.3f ms\n", total_time);
-  fprintf(stderr, "  Min time: %.3f ms\n", min_time);
-  fprintf(stderr, "  Max time: %.3f ms\n", max_time);
-  fprintf(stderr, "  Avg time: %.3f ms\n", avg_time);
+  fprintf(stderr, "  Min/Avg/Max time: %.3f/%.3f/%.3f ms\n", min_time, avg_time, max_time);
 }
 
 void sig_handler(int _signum)
@@ -85,7 +83,7 @@ void print_usage()
   // Print usage information
   fprintf(stderr, "Usage: console_loopback_timer [-c N] [-q] [-v] [-g] [-n] [-i N]\n");
   fprintf(stderr, "  -c N     After N lines are received, exit the program\n");
-  fprintf(stderr, "  -q       Quiet mode. Do not print the timing of each line as it is received.\n");
+  fprintf(stderr, "  -q       Quiet mode. Do not print the received lines.\n");
   fprintf(stderr, "  -v       Verbose mode. Print the running statistics of the timing for each line.\n");
   fprintf(stderr, "  -g       Graph mode. Instead of timing information, print an ASCII bar graph.\n");
   fprintf(stderr, "  -n       No statistical summary. Suppress printing the statistical summary when exiting.\n");
@@ -183,7 +181,7 @@ int main(int argc, char *argv[])
 
     // Calculate elapsed time
     timersub(&end_time, &start_time, &elapsed_time);
-    double elapsed_ms = (elapsed_time.tv_sec * 1e3) + (elapsed_time.tv_usec / 1e3);
+    double elapsed_ms = ((double)elapsed_time.tv_sec * 1000.0) + ((double)elapsed_time.tv_usec / 1000.0);
 
     // Update total time and statistics
     
@@ -202,27 +200,22 @@ int main(int argc, char *argv[])
     }
     avg_time = total_time / lines_received;
 
-    // Print timing information
-    if (!quiet)
-    {
-      if (graph)
+    // Print stuff
+    if(verbose) {
+      printf("%.3f ms (min: %.3f, max: %.3f, avg: %.3f)\n", elapsed_ms, min_time, max_time, avg_time);
+    }
+
+    if(!quiet) {
+      printf("%s\n", buffer);
+    }
+
+    if(graph) {
+      int bar_length = (int)(elapsed_ms * 10); // Scale for graph
+      for (int i = 0; i < bar_length; i++)
       {
-        int bar_length = (int)(elapsed_ms * 10); // Scale for graph
-        printf("%s", buffer);
-        for (int i = 0; i < bar_length; i++)
-        {
-          putchar('#');
-        }
-        putchar('\n');
+        putchar('#');
       }
-      else if (verbose)
-      {
-        printf("%s: %.3f ms (min: %.3f, max: %.3f, avg: %.3f)\n", buffer, elapsed_ms, min_time, max_time, avg_time);
-      }
-      else
-      {
-        printf("%s\n", buffer);
-      }
+      putchar('\n');
     }
 
     // Check for count limit
