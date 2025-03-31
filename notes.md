@@ -325,6 +325,35 @@ It's also worth pointing out that at least one packet arrived early or something
 because there's a minium value of only 1.066 ms. Nothing arrived too late,
 however. The longest delay was 2.638 ms.
 
+## setting up a reflector and doing round trip
+
+On the remote box, which is the "reflector", I used:
+```
+mkfifo /tmp/fifooo
+cat /tmp/fifooo | nc -vvv -u -l -p 5555 -s 192.168.0.61 > /tmp/fifooo
+```
+
+This makes a FIFO to bounce data through. For UDP you will probably also have to
+use the `-s` flag to get it to work. Also note that this is the 'listener' in
+terms of `netcat`.
+
+On the local box, you will send data and measure what come back with:
+`./rate_limited_data_generator/rate_limited_data_generator -r 8000 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 8000 -q`
+
+As an example, over WiFi, I got:
+```
+Summary:
+  Total lines received: 8000
+  Total time: 1213.977 ms
+  Min/Avg/Max time: 0.000/0.152/5.852 ms
+```
+
+Conceptually, if it took 1213ms to receive what should have been 1000ms worth of
+data, it means some packets were lost along the way. And that some took 5.9ms to
+arrive and they should have been more like 0.125us, shows that there were gaps
+or something in the data.
+
+
 
 
 
