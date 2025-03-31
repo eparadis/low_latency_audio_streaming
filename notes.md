@@ -353,7 +353,148 @@ data, it means some packets were lost along the way. And that some took 5.9ms to
 arrive and they should have been more like 0.125us, shows that there were gaps
 or something in the data.
 
+For comparison, just running through a pipe locally produces:
+```
+./rate_limited_data_generator/rate_limited_data_generator -r 8000 -b '0 100' | ./console_loopback_timer/console_loopback_timer -c 8000 -q
+
+Summary:
+  Total lines received: 8000
+  Total time: 1286.082 ms
+  Min/Avg/Max time: 0.127/0.161/0.204 ms
+```
+
+(I ran this a few times and the results were not identical but they were pretty
+similar.)
+
+Notable differences is that the minimum time is very close to the rate limit of
+0.125ms and the maximum time isn't too much beyond the rate limit. The average
+is still ~40us more than the desired rate. It seems reasonable to consider this
+the overhead since we're waiting for 8000 samples exactly and are using a loss-
+less channel.
+
+Also interesting is the similarities to going out and back over the WiFi. Both
+took about 1260ms for one second's worth of data. I don't think I can account
+for that yet.
+
+I don't know what part of this method isn't capturing what I want to measure.
+I don't think that the average time between samples results in a frequency of
+6589 Hz in one case and 6211 Hz in the other is actually a problem. This is
+sending single data points at a time, which is highly inefficient. In reality,
+we would buffer some fixed amount of data points and send them all at once. For
+example, simply taking buffering on 8 data points would result in a rate of 1000
+Hertz. Simluating that across the network:
+```
+$ ./rate_limited_data_generator/rate_limited_data_generator -r 1000 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 1000 -q
+
+Summary:
+  Total lines received: 1000
+  Total time: 1239.831 ms
+  Min/Avg/Max time: 0.000/1.240/3.628 ms
+```
+
+It seems notable that the total time is the same. I wonder if this holds for
+lower rates too.
+```
+$ ./rate_limited_data_generator/rate_limited_data_generator -r 500 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 500 -q
+
+Summary:
+  Total lines received: 500
+  Total time: 1160.478 ms
+  Min/Avg/Max time: 0.000/2.321/8.683 ms
+```
+
+```
+$ ./rate_limited_data_generator/rate_limited_data_generator -r 100 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 100 -q
+
+Summary:
+  Total lines received: 100
+  Total time: 1184.489 ms
+  Min/Avg/Max time: 0.000/11.845/15.388 ms
+```
+
+```
+$ ./rate_limited_data_generator/rate_limited_data_generator -r 50 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 50 -q
+
+Summary:
+  Total lines received: 50
+  Total time: 1173.950 ms
+  Min/Avg/Max time: 7.903/23.479/28.791 ms
+```
+
+Maybe there's some sampling problems if we go much lower, so lets try higher.
+```
+./rate_limited_data_generator/rate_limited_data_generator -r 5000 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 5000 -q
+
+Summary:
+  Total lines received: 5000
+  Total time: 1205.077 ms
+  Min/Avg/Max time: 0.000/0.241/5.949 ms
+```
+
+```
+./rate_limited_data_generator/rate_limited_data_generator -r 11025 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 11025 -q
+
+Summary:
+  Total lines received: 11025
+  Total time: 1254.189 ms
+  Min/Avg/Max time: 0.000/0.114/7.254 ms
+```
+
+```
+./rate_limited_data_generator/rate_limited_data_generator -r 22050 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 22050 -q
+
+Summary:
+  Total lines received: 22050
+  Total time: 1260.649 ms
+  Min/Avg/Max time: 0.000/0.057/5.465 ms
+```
+
+And notably, full CD audio rate just doesn't work
+```
+./rate_limited_data_generator/rate_limited_data_generator -r 44100 -b '0 100' |  nc --verbose -u 192.168.0.61 5555 | ./console_loopback_timer/console_loopback_timer -c 44100 -q
+Warning: Overrun detected. Adjusting sleep time.
+Warning: Overrun detected. Adjusting sleep time.
+write(net): No buffer space available
+
+Summary:
+  Total lines received: 4254
+  Total time: 248.333 ms
+  Min/Avg/Max time: 0.000/0.058/9.487 ms
+```
 
 
+So the results of all these tests summarized in a table shows that the overhead
+doesn't _really_ change between sample rates.
+```
+Rate   | Total time | Ideal sample period | Max time
+-------+------------+---------------------+-----------
+22050  | 1261       |    45.4 us          |  5.465 ms
+11025  | 1254       |    90.7 us          |  7.254 ms
+ 8000  | 1214       |   125   us          |  5.852 ms
+ 5000  | 1205       |   200   us          |  5.949 ms
+ 1000  | 1240       |  1.0    ms          |  3.628 ms
+  500  | 1160       |  2.0    ms          |  8.683 ms
+  100  | 1184       | 10.0    ms          | 15.388 ms
+   50  | 1173       | 20.0    ms          | 28.791 ms
+```
+So if we're okay with 20ms of "artificial" delay, we need to cram all the data
+we want into a packet and send it every 50ms. In our test above it took up to
+28.8ms between packets, which means 8.8ms more delay.
+
+So probably the "rate" we should concern ourselves with is the rate at which the
+data point bundles are sent. That perhaps could be a tunable parameter or even
+something that the system measures and adapts over time. That is to say for any
+given network distance and condition, there is probably a "sweet spot" where
+the bundle transmit rate is high but the max time a packet takes is low. I added
+a column in the table that suggests the sweet spot is around 1000 Hz. If the
+audio was sampled at 48kHz, each packet would only need 48 samples. At 32bits
+per sample, that's 1536 bytes. That's _suspiciously_ close to the standard MTU
+of ethernet (1500). I don't know how the overhead works, but it stands to reason
+that there would be a optimal point somewhere around there.
+
+The next step is to build a measurement tool that uses the reflect technique
+shown above to directly measure the time it takes different sized packets at
+different rates. This is sounding a lot like an ICMP ping tool that leaves its
+connections open.
 
 
