@@ -10,6 +10,7 @@ It takes the following command line options, all of which are optional.
                     back towards N. Once at N, it will begin incrementing again, producing a "triangle wave" of values.
                     The default is -128 to 128
   -c N              Send N values and then terminate. Negative values are treated as "forever". This is default behavior.
+  -v                Print a line of timing info for each data point sent.
 */
 
 #include <stdio.h>
@@ -46,7 +47,7 @@ int main(int argc, char *argv[])
   struct timeval start_time, end_time, elapsed_time;
 
   // Parse command line arguments
-  while ((c = getopt(argc, argv, "r:b:c:")) != -1)
+  while ((c = getopt(argc, argv, "r:b:c:v")) != -1)
   {
     switch (c)
     {
@@ -109,7 +110,7 @@ int main(int argc, char *argv[])
     if (sleep_time_micros > 0)
     {
       if (verbose)
-        printf("rate: %d Hz  target time: %ld us  elapsed time: %ld us  sleep time: %ld us\n", rate, target_time_micros, elapsed_micros, sleep_time_micros);
+        fprintf(stderr, "rate: %d Hz  target time: %ld us  elapsed time: %ld us  sleep time: %ld us\n", rate, target_time_micros, elapsed_micros, sleep_time_micros);
       usleep(sleep_time_micros); // Sleep for the remaining time
     }
     else
@@ -119,7 +120,8 @@ int main(int argc, char *argv[])
     }
     // Reset start time for the next iteration
     gettimeofday(&start_time, NULL);
-
   }
+
+  fprintf(stderr, "data points sent: %d\n", count);
   return 0;
 }
